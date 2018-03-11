@@ -1,0 +1,17 @@
+(...)? = optional parameter
+<...> = required parameter
+
+Http Request format: 
+<httpmethod> /api/devices(((/deviceName/resources)?/<resourceCategory>)?/resourceId)?
+
+Request message: 
+<{
+    <action:  (INQUIRY|READ|WRITE))>,
+    (device:  String)?,
+    (resource:  {
+        <category:  String>,
+        (id:  Integer)?
+    }:  JsonObject)?,
+    (query:  JsonObject)?,
+    (payload:  JsonObject)?
+}:  JsonObject>

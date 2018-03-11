@@ -1,0 +1,9 @@
+\select@language {italian}
+\select@language {italian}
+\contentsline {section}{\numberline {1}Architettura del sistema}{2}
+\contentsline {subsection}{\numberline {1.1}Architettura sotto-sistema Master}{2}
+\contentsline {subsection}{\numberline {1.2}Sottosistemi Things}{2}
+\contentsline {section}{\numberline {2}Implementazione}{2}
+\contentsline {section}{\numberline {3}Guida utente}{3}
+\contentsline {section}{\numberline {4}Risultati ottenuti}{4}
+\contentsline {section}{\numberline {5}Possibili sviluppi futuri}{4}

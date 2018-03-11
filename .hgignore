@@ -1,0 +1,47 @@
+syntax: glob
+
+# Arduino Project
+*.tmp
+*.hex
+
+# macOS Files
+.DS_Store
+._*
+
+# VIM swap files
+*.swp
+.*.swp
+
+# gedit temp files
+*~
+.*~
+
+# Generic backup files
+*.bak
+.*.bak
+*.tmp
+.*.tmp
+
+# Eclipse Workspaces Files
+.metadata/
+.recommenders/
+RemoteSystemsTempFiles/
+
+# JVM class files
+*.class
+
+# Eclipse Bytecode Folder
+bin/
+
+# Maven Bytecode and JARs Folder
+target/
+
+# Python compiled files
+*.pyc
+.*.pyc
+
+# Visual Studio Code
+.vscode
+
+.idea/
+

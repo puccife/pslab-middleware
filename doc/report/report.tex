@@ -1,0 +1,292 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[italian]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[applemac]{inputenc}
+%\usepackage{float}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\newcommand{\vertx}{Vert.x}
+
+%\renewcommand{\contentsname}{Indice}
+
+\title{\textbf{\huge{Relazione e guida utente infrastruttura per Web of Things}}}
+\author{
+    Nicola Piscaglia\\
+    \texttt{nicola.piscaglia2@studio.unibo.it}
+    \and
+    Federico Pucci\\
+    \texttt{federico.pucci2@studio.unibo.it}
+    \and
+    Mattia Vandi\\
+    \texttt{mattia.vandi@studio.unibo.it}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+L'obiettivo dell'attivit\`a di tirocinio consiste nella progettazione e sviluppo di supporti infrastrutturali e middleware per sistemi IoT (Internet of Things) e WoT (Web of Things) che prevedono l'integrazione di dispositivi eterogenei quali Arduino e Raspberry Pi, usando REST-ful web service come architettura di riferimento e protocolli Bluetooth e Wi-Fi come tecnologie wireless.
+
+Il nostro scopo \`e abilitare l'utilizzatore del middleware alla connettivit\`a con oggetti del mondo fisico, rappresentati nel nostro caso dai dispositivi Arduino, attraverso una API che interagisca con un Server REST.
+%
+Quest'ultimo sar\`a allocato su un dispositivo Raspberry Pi che funger\`a da coordinatore delle "Things" del sistema e delle richieste provenienti dall'esterno della rete.
+%
+I sistemi Arduino sono visti come risorsa rappresentante la Thing ma potrebbero gestire anche pi\`u risorse come sensori e attuatori.
+
+Il nostro obiettivo di partenza \`e la realizzazione di un sistema che riceva chiamate da un Client HTTP e che permetta di reperire informazioni riguardo lo stato delle risorse e di modificarne lo stato tramite chiamata REST.
+
+Il nostro caso di studio \`e limitato ad un solo coordinatore Raspberry Pi dei dispositivi Arduino che vengono fisicamente contattati tramite la tecnologia Bluetooth: questa tecnologia wireless vincola il numero dei dispositivi connessi simultaneamente ad un massimo di sette per master.
+%
+Per risolvere questo vincolo dettato dal Bluetooth ci prefiggiamo di mettere a disposizione due modalit\`a di comunicazione:
+
+\begin{itemize}
+
+\item Persistente: il device Bluetooth viene connesso con un apposita chiamata ed occupa una delle sette connessioni disponibili.
+%
+Da utilizzare se si necessita di efficienza in termini temporali nella comunicazione.
+
+\item Non persistente: il device Bluetooth viene connesso dinamicamente nel momento in cui si richiede una comunicazione con la Thing e la connessione viene chiusa subito dopo l'avvenuto scambio di messaggi.
+%
+In questo modo non si occupano in modo persistente spazi per la connessione ed \`e possibile anche comunicare con pi\`u di sette dispositivi, occorre per\`o considerare che i tempi di risposta crescono rispetto alla modalit\`a descritta precedentemente.
+
+\end{itemize}
+
+L'analisi delle prestazioni del sistema verr\`a discussa con maggiore precisione nelle sezioni successive, per ora ci siamo limitati a descrivere logicamente il sistema.
+
+Nella prossima sezione verranno discusse le scelte relative all'architettura delle sottoparti del sistema con maggior dettaglio.
+
+\end{abstract}
+
+\newpage
+
+\section{Architettura del sistema}
+
+La struttura del sistema \`e composta dai sottosistemi:
+
+\begin{itemize}
+
+\item Master rappresentato nello specifico da Raspberry Pi 3.
+
+\item Things rappresentato da uno o pi\`u Arduino e relativi componenti.
+
+\end{itemize}
+
+\subsection{Architettura sotto-sistema Master}
+
+Il Master gestisce le richieste provenienti dall'esterno, le indirizza alle things e restituisce al chiamante le relative risposte.
+
+A livello software il problema \`e stato decomposto in tre livelli differenti che gestiscono differenti aspetti della comunicazione:
+
+\begin{itemize}
+
+\item REST-ful Server: \`e il layer di pi\`u alto livello.
+%
+Gestisce la ricezione delle richieste provenienti da rete attraverso un server HTTP e le relative risposte ai Client.
+%
+Alla ricezione di chiamate REST, le richieste vengono propagate agli strati inferiori tramite il layer sottostante detto EventBus.
+
+\item EventBus Server: rappresenta un canale di comunicazione tra gli altri due layer del sottosistema che si possono iscrivere ed ascoltare i messaggi sul bus per questo fa da collante tra il REST-ful Server e il CommunicationManager.
+%
+Gestisce le richieste dall'alto e risposte dal basso in delle code di messaggi garantendo la corrispondenza tra request/response. 
+
+\item Communication Manager: si occupa dell'indirizzamento, invio/ricezione fisica dell'informazione con i sottosistemi Things.
+%
+Mantiene una lista delle Things associate disponibili e di quelle connesse nello specifico istante e controlla la comunicazione con pi\`u dispositivi offrendo la possibilit\`a di una connessione persistente o non persistente.
+%
+La comunicazione avviene utilizzando il formato JSON.
+
+\end{itemize}
+
+\subsection{Sottosistemi Things}
+
+Rappresenta l'oggetto fisico con cui comunicare ed \`e gestito da un Arduino UNO.
+
+A livello software sono stati incapsulati in apposite classi di modello i componenti passivi del sottosistema rappresentati come risorse sulla base del modello REST.
+%
+Per quanto riguarda la comunicazione \`e stata definita una classe di gestione che controlla a polling la presenza di un messaggio in ricezione ed invia la risposta in formato JSON.
+
+Il contenuto delle risposte  \`e definito in modo specifico dalle risorse implementate che estendono una classe astratta AbstractResource e ne implementano i metodi concreti (GET / PUT) per soddisfare la relativa richiesta.
+
+\section{Implementazione}
+
+Sottosistema Master: \`e stato utilizzato il framework \vertx \,  per costruire un'applicazione reattiva e scalabile sulla base del modello di programmazione asincrono ad eventi con comunicazione non bloccante:
+
+\begin{itemize}
+
+\item \texttt{RESTfulServer}: implementa in Java un server REST HTTP contattabile dalla rete.
+
+\item \texttt{EventBusServer}: codificato anch'esso in Java.
+%
+Permette di avviare il canale chiamato Eventbus fornito da \vertx \, attraverso il quale gli altri due layer del Master
+comunicano. Gestisce le code di messaggi/richieste.
+
+\item \texttt{CommunicationManager}: scritto in Python.
+%
+Include la libreria Pybluez per implementare la comunicazione Bluetooth con i sottosistemi Things.
+
+\end{itemize}
+
+Sottosistema Things: implementazione realizzata mediante linguaggio standard C/C++, usando le strutture dati incluse nella libreria AVR-STL (Standard Template Library).
+
+La comunicazione \`e stata realizzata mediante il protocollo Bluetooth RFCOMM che sfrutta la seriale per inviare dati tramite protocollo Wireless Bluetooth.
+
+Per la codifica/decodifica dei messaggi in formato JSON \`e stata utilizzata un apposita libreria chiamata ArduinoJson.
+
+\section{Guida utente}
+
+Abbiamo reso disponibili due implementazioni dell'infrastruttura:
+\begin{itemize}
+
+\item Una semplificata in cui \`e possibile riferirsi direttamente alla risorsa senza specificare il nome del dispositivo e la categoria alla quale appartiene.
+
+\item Ed una pi\`u complessa in cui \`e necessario specificare il nome del dispositivo e la categoria alla quale la risorsa appartiene.
+
+\end{itemize}
+
+\noindent Ai fini dell'operativit\`a del sistema vanno avviati i seguenti componenti raggruppati per sottosistemi:
+
+\begin{itemize}
+
+\item \textbf{Sottosistema Master}: si riportano i comandi di avvio dei componenti e le istruzioni per eseguirli, ricordando che \`e necessario avere installato sul Raspberry Pi \vertx \, 3 e Python:
+\begin{itemize}
+
+\item \textbf{REST-ful Server}
+
+\begin{itemize}
+
+\item[\$] \texttt{cd middleware/bt-connectivity/src/main/java/it/unibo/restapi}
+
+\item[\$] \texttt{vertx run RESTfulServer.java -ha}
+
+\end{itemize}
+
+\item \textbf{Eventbus Server}
+
+\begin{itemize}
+
+\item[\$] \texttt{cd middleware/bt-connectivity/src/main/java/it/unibo/server}
+
+\item[\$] \texttt{vertx run EventBusServer.java -ha}
+
+\end{itemize}
+
+\item \textbf{Communication Manager}
+
+\begin{itemize}
+\item[\$] \texttt{cd middleware/bt-connectivity/src/main/python}
+
+\item[\$] \texttt{python communicationmanager\_v2.py}
+
+\end{itemize}
+
+\end{itemize}
+
+\item Sottosistemi Things: \`e sufficiente caricare sul microcontrollore lo Sketch Arduino "testbluetooth" presente nella cartella del progetto \\\texttt{middleware/bt-connectivity/src/main/arduino/testbluetooth}.
+
+\end{itemize}
+
+Dopo aver caricato tutti i componenti descritti in precedenza \`e possibile contattare il REST-ful Server all'indirizzo associato al Raspberry Pi sulla porta 8080 attraverso un qualsiasi REST Client (es: Browser Web, Advanced Rest Client, Postman, ecc).
+%
+Lista delle URI e dei metodi disponibili:
+
+\begin{itemize}
+
+\item \texttt{/api/inquiry}
+
+\begin{itemize}
+
+\item GET: restituisce un elenco delle risorse disponibili non connesse in maniera persistenti. Parametri:
+
+\begin{itemize}
+
+\item \texttt{duration}: numero di secondi impiegati per la ricerca (opzionale, default 8 secondi)
+
+\end{itemize}
+
+\end{itemize}
+
+\item \texttt{/api/resources}
+
+\begin{itemize}
+
+\item GET: restituisce una lista degli identificativi delle risorse connesse in maniera persistente.
+
+\item POST: tenta di connettere la risorsa indicata. Parametri:
+
+\begin{itemize}
+
+\item \texttt{resourceId}: identificativo della risorsa che si vuole connettere
+
+\end{itemize}
+
+\end{itemize}
+
+\item \texttt{/api/resources/:resourceId}
+
+\begin{itemize}
+
+\item GET: restituisce lo stato della risorsa indicata.
+%
+Il corpo della risposta pu\`o essere definito dallo sviluppatore durante l'implementazione delle singola risorsa.
+
+\item PUT / PATCH: modifica lo stato della risorsa indicata. I parametri possono essere definiti dallo sviluppatore durante l'implementazione delle singole risorse.
+
+\item DELETE: elimina la connessione persistente precedentemente creata o restituisce errore se non \`e stata creata in precedenza.
+
+\end{itemize}
+
+\end{itemize}
+
+\section{Risultati ottenuti}
+
+Il sistema realizzato permette di leggere e modificare risorse attraverso chiamate REST con un buon grado di affidabilit\`a nella comunicazione anche se non sempre in maniera tempestiva.
+
+I tempi di risposta alle chiamate effettuate da noi rilevati, si aggirano in media sui 2,5 secondi utilizzando una connessione non persistente e sui 0,5 secondi utilizzando una connessione persistente.
+
+La maggior parte del ritardo nella comunicazione \`e dettata dal limite fisico del Bluetooth utilizzato sia per la procedura di connessione (circa 2 secondi) sia per l'invio/ricezione di dati (dai 100 ai 400 ms circa): infatti provando ad effettuare richieste che non necessitano di comunicazione BT (inoltrate fino allo strato del Communication Manager), si ottengono tempi di risposta sull'ordine dei 90 ms.
+
+Mentre i tempi di risposta ottenuti con connessione persistente sono accettabili, la comunicazione con connessione dinamica risulta eccessivamente lenta.
+%
+Quest'ultima per\`o ha il vantaggio di scollegare automaticamente il dispositivo al termine della comunicazione il che influisce positivamente sul numero di connessioni simultanee disponibili (massimo 7).
+
+Per questo se si necessita di prestazioni in termini temporali \`e indispensabile utilizzare connessioni persistenti mentre se non si hanno vincoli temporali stringenti ed un numero di dispositivi maggiore di sette \`e possibile fare ricorso a connessioni non persistenti.
+
+\section{Possibili sviluppi futuri}
+
+Il naturale sviluppo di questo progetto \`e rappresentato dall'integrazione dell'interazione del mondo fisico con il mondo digitale.
+
+Sarebbe interessante sviluppare la parte di comunicazione che viene scatenata dagli effetti sul mondo fisico e propaga informazione attraverso i vari sottosistemi fino ad arrivare in maniera digitale all'utente.
+
+Un semplice esempio con cui partire potrebbe essere l'invio dello stato del bottone su una pagina web alla pressione dello stesso (e non su richiesta GET dell'utente).
+
+L'implementazione potrebbe essere realizzata a livello di Master attraverso l'utilizzo di Web Socket, mentre lato Things si potrebbe associare un interrupt al bottone oppure utilizzare una strategia a polling.
+
+Un ulteriore sviluppo del progetto potrebbe riguardare l'inserimento di un pool di ThreadExecutor sulla parte del Communication Manager in Python al posto di allocare thread per ogni nuova connessione, al fine di ottimizzare il consumo di risorse in termini di memoria all'aumentare delle connessioni da gestire.
+
+\section{Riferimenti}
+
+Lista delle varie tecnologie/framework utilizzati per lo sviluppo dell'infrastruttura:
+\begin{enumerate}
+
+\item \href{http://vertx.io/docs/vertx-core/java}{\vertx \, Core}
+
+\item \href{http://vertx.io/docs/vertx-web/java}{\vertx \, Web}
+
+\item \href{http://vertx.io/docs/vertx-tcp-eventbus-bridge/java}{\vertx \, TCP Event bus Bridge}
+
+\item \href{http://jaymine.github.io/TCP-eventbus-client-Python/}{Python \vertx \, TCP Event bus Client}
+
+\item \href{http://karulis.github.io/pybluez/}{Pybluez}
+
+\item \href{http://andybrown.me.uk/2011/01/15/the-standard-template-library-stl-for-avr-with-c-streams/}{Standard Template Library for AVR}
+
+\item \href{https://bblanchon.github.io/ArduinoJson}{ArduinoJson}
+
+\end{enumerate}
+
+\end{document}
